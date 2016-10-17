@@ -250,6 +250,25 @@ def summary(title, sentences=0, chars=0, auto_suggest=True, redirect=True):
 
   return summary
 
+def category_members(category):
+  if category is not None:
+    search_params = {
+      'list': 'categorymembers',
+      'cmtitle': 'Category:' + category,
+      'cmlimit': '20'
+    }
+    raw_results = _wiki_request(search_params)
+  
+    if 'error' in raw_results:
+      if raw_results['error']['info'] in ('HTTP request timed out.', 'Pool queue is full'):
+        raise HTTPTimeoutError(query)
+      else:
+        raise WikipediaException(raw_results['error']['info'])
+    else:
+      return [result['title'] for result in raw_results['query']['categorymembers']]
+  else:
+    raise ValueError("Category must be specified")
+
 
 def page(title=None, pageid=None, auto_suggest=True, redirect=True, preload=False):
   '''
@@ -386,7 +405,7 @@ class WikipediaPage(object):
       request = _wiki_request(query_params)
       html = request['query']['pages'][pageid]['revisions'][0]['*']
 
-      lis = BeautifulSoup(html).find_all('li')
+      lis = BeautifulSoup(html,'html.parser').find_all('li')
       filtered_lis = [li for li in lis if not 'tocsection' in ''.join(li.get('class', []))]
       may_refer_to = [li.a.get_text() for li in filtered_lis if li.a]
 
@@ -615,6 +634,7 @@ class WikipediaPage(object):
 
     return self._links
 
+
   @property
   def categories(self):
     '''
@@ -626,7 +646,8 @@ class WikipediaPage(object):
         [link['title']
         for link in self.__continued_query({
           'prop': 'categories',
-          'cllimit': 'max'
+          'cllimit': 'max',
+          'clshow': '!hidden'
         })
       ]]
 
